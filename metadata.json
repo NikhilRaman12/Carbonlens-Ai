@@ -1,0 +1,6 @@
+{
+  "name": "CarbonLens",
+  "description": "An AI-powered personal carbon footprint tracker and reduction coach across 8 life categories.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
