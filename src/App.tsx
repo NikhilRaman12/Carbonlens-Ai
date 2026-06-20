@@ -131,6 +131,7 @@ function generateLocalFallbackInsight(currentEntries: CarbonEntry[]): CoachInsig
 export default function App() {
   // In-app states
   const [entries, setEntries] = useState<CarbonEntry[]>([]);
+  const [srAnnouncement, setSrAnnouncement] = useState('');
   const [settings, setSettings] = useState<GoalSettings>({
     targetPercentage: 15,
     gridEmissions: 0.71,
@@ -349,6 +350,7 @@ export default function App() {
     }
 
     setEntries(list);
+    setSrAnnouncement('Laid down full active carbon trace preset logs for live demo analytics.');
     triggerCoachInsightRebuild(list);
   };
 
@@ -361,6 +363,7 @@ export default function App() {
     
     const updated = [newEntry, ...entries];
     setEntries(updated);
+    setSrAnnouncement(`Added new carbon footprint entry in category ${entryData.category} for ${entryData.subtype} of ${entryData.quantity} ${entryData.unit}, adding ${entryData.co2e.toFixed(1)} kilograms of CO2 equivalent.`);
 
     // Silent rebuild of local recommendation stats
     triggerCoachInsightRebuild(updated);
@@ -368,8 +371,11 @@ export default function App() {
 
   // Delete logged entries
   const handleDeleteEntry = (id: string) => {
+    const targetEntry = entries.find((e) => e.id === id);
+    const label = targetEntry ? `${targetEntry.category} ${targetEntry.subtype}` : 'record';
     const filtered = entries.filter((e) => e.id !== id);
     setEntries(filtered);
+    setSrAnnouncement(`Deleted carbon footprint record for ${label}.`);
     triggerCoachInsightRebuild(filtered);
   };
 
@@ -419,6 +425,7 @@ export default function App() {
       localStorage.removeItem('carbonlens_entries');
       localStorage.removeItem('carbonlens_settings');
       localStorage.removeItem('carbonlens_insight');
+      setSrAnnouncement('Cleared all dynamic carbon footprint entries and restored settings. Dashboard has been reset.');
     }
   };
 
@@ -508,6 +515,11 @@ export default function App() {
   return (
     <div id="carbonlens-root" className="min-h-screen bg-stone-50 text-stone-850 font-sans selection:bg-emerald-200 select-none pb-12">
       
+      {/* ARIA Live Region for accessibility screen readers */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {srAnnouncement}
+      </div>
+
       {/* Visual Brand Header Section */}
       <header className="bg-white border-b border-stone-100 sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -584,17 +596,53 @@ export default function App() {
 
       {/* Main Workspace Grid layouts */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+        {/* HOW CARBONLENS WORKS - PROBLEM STATEMENT ALIGNMENT */}
+        <section aria-labelledby="how-it-works-title" className="bg-white border border-stone-200/80 rounded-[2.5rem] p-6 shadow-xs">
+          <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+            <div className="space-y-1.5 max-w-sm">
+              <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-extrabold uppercase tracking-widest leading-none">
+                Onboarding Guide
+              </span>
+              <h2 id="how-it-works-title" className="text-xl font-black text-stone-850 tracking-tight">
+                How CarbonLens Works
+              </h2>
+              <p className="text-stone-400 text-xs font-semibold">
+                Understand, track, and systematically lower your environmental footprint in 4 simple checkpoints.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto flex-1">
+              {[
+                { step: '1', title: 'Log Activity', text: 'Tap organic category leaf tiles or connect Gmail/Calendar feeds.' },
+                { step: '2', title: 'See CO2e Impact', text: 'Receive instantaneous physical calculations of carbon cost.' },
+                { step: '3', title: 'AI-Powered Tips', text: 'Let our smart environmental proxy guide reduction strategies.' },
+                { step: '4', title: 'Track and Progress', text: 'Maintain streaks and compare stats against national limits.' }
+              ].map((item, idx) => (
+                <div key={idx} className="bg-stone-50 border border-stone-105 p-4 rounded-2xl space-y-1.5 flex flex-col justify-between">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    {item.step}
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-black text-stone-850 leading-tight tracking-tight">{item.title}</h4>
+                    <p className="text-[10px] text-stone-400 font-semibold leading-snug mt-0.5">{item.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
         
         {/* Quick-Add Cluster Layout and Footprint/leaf representation */}
-        <section className="space-y-4">
+        <section aria-labelledby="track-heading" className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <span className="text-[10px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
                 Organic Tapping Center
               </span>
-              <h2 className="text-xl font-black text-stone-800 tracking-tight mt-1.5 flex items-center gap-2">
+              <h2 id="track-heading" className="text-xl font-black text-stone-800 tracking-tight mt-1.5 flex items-center gap-2">
                 <CalendarCheck2 className="w-5 h-5 text-emerald-600" />
-                Quick-Log Footprint Leaf Cluster
+                TRACK: Quick-Log Footprint Leaf Cluster
               </h2>
               <p className="text-stone-400 text-xs font-medium mt-0.5">
                 Tap any category tile below to quickly record daily emissions. Take under 10 seconds.
@@ -642,10 +690,11 @@ export default function App() {
               const catSum = currentPeriodEntries.filter((e) => e.category === cat).reduce((sum, e) => sum + e.co2e, 0);
 
               return (
-                <div
+                <button
                   key={cat}
                   onClick={() => setSelectedQuickAddCategory(cat)}
-                  className={`relative p-5 rounded-tr-[2.2rem] rounded-bl-[2.2rem] rounded-tl-xl rounded-br-xl border text-center transition-all hover:-translate-y-1 hover:shadow-lg active:scale-95 cursor-pointer flex flex-col justify-between h-[165px] overflow-hidden ${details.bgColor} ${details.borderColor}`}
+                  className={`relative p-5 rounded-tr-[2.2rem] rounded-bl-[2.2rem] rounded-tl-xl rounded-br-xl border text-center transition-all hover:-translate-y-1 hover:shadow-lg active:scale-95 cursor-pointer flex flex-col justify-between h-[165px] overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/55 ${details.bgColor} ${details.borderColor}`}
+                  aria-label={`Quick log ${cat} consumption. Current period logged amount is ${catSum.toFixed(1)} kilograms.`}
                 >
                   <div className="flex justify-between items-start">
                     {/* Icon container */}
@@ -679,7 +728,7 @@ export default function App() {
 
                   {/* Bottom custom prompt view trigger */}
                   <div className="flex justify-end pr-1">
-                    <button
+                    <span
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedDetailCategory(cat);
@@ -687,99 +736,125 @@ export default function App() {
                       className="text-[9px] hover:underline font-extrabold text-stone-400 hover:text-stone-700 cursor-pointer"
                     >
                       Logs & Tips →
-                    </button>
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         </section>
 
-        {/* AI Sustainability Coach Secured proxy card */}
-        <CoachCard
-          entries={entries}
-          targetPercentage={settings.targetPercentage}
-          gridEmissions={settings.gridEmissions}
-          insight={coachInsight}
-          onRefreshInsight={handleRefreshCoachInsight}
-          isLoadingInsight={isLoadingInsight}
-        />
-
-        {/* Workspace Automated Feeds & Cloud resources sandbox */}
-        <WorkspaceSyncSandbox
-          onAddEntry={handleAddNewEntry}
-          gridEmissions={settings.gridEmissions}
-        />
-
-        {/* Goals & Streak components */}
-        <GoalStreakCard
-          entries={entries}
-          settings={settings}
-          onUpdateSettings={setSettings}
-        />
-
-        {/* Comparative India Benchmarks panel */}
-        <BenchmarkBanner
-          monthlyAmountKg={monthlyTotal}
-          benchmarkConstantKgYearly={settings.nationalAverageKg}
-        />
-
-        {/* Charts & Timeline Visual Footprint displays */}
-        <BreakdownChart entries={entries} />
-
-        {/* Recent logs audit section */}
-        {entries.length > 0 && (
-          <div className="bg-white rounded-[2rem] border border-stone-100 p-6 shadow-xs">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                <History className="w-4 h-4 text-indigo-600" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-stone-800">Recent Tracking Logs Audit</h4>
-                <p className="text-[10px] text-stone-400 font-medium">Review and modify recent carbon records</p>
-              </div>
-            </div>
-
-            <div className="divide-y divide-stone-100">
-              {recentLogs.map((entry) => {
-                const details = CATEGORY_DETAILS[entry.category];
-                return (
-                  <div key={entry.id} className="py-3 flex justify-between items-center text-xs">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: details.color }} />
-                        <span className="font-extrabold text-[#1B3022]">{entry.category}</span>
-                        <span className="text-stone-400">•</span>
-                        <span className="text-stone-500 font-medium">{entry.subtype}</span>
-                        {entry.notes && (
-                          <span className="text-[9px] bg-stone-100 px-1.5 py-0.5 rounded text-stone-400">
-                            {entry.notes}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-stone-400 block mt-0.5">
-                        Logged {entry.date} with {entry.quantity} {entry.unit}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className={`font-black ${entry.co2e < 0 ? 'text-emerald-700' : 'text-stone-800'}`}>
-                        {entry.co2e > 0 ? `+${entry.co2e.toFixed(1)}` : entry.co2e.toFixed(1)} kg CO2e
-                      </span>
-                      <button
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        className="p-1 px-1.5 hover:bg-rose-50 rounded-lg text-stone-400 hover:text-rose-600 cursor-pointer"
-                        title="Delete log"
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* REDUCE: personalized AI and offline carbon advice coach */}
+        <section aria-labelledby="reduce-heading" className="space-y-4">
+          <div className="border-l-4 border-emerald-500 pl-3">
+            <h3 id="reduce-heading" className="text-sm font-black text-emerald-850 uppercase tracking-widest">
+              REDUCE: Personalized AI Recommendations
+            </h3>
           </div>
-        )}
+          <CoachCard
+            entries={entries}
+            targetPercentage={settings.targetPercentage}
+            gridEmissions={settings.gridEmissions}
+            insight={coachInsight}
+            onRefreshInsight={handleRefreshCoachInsight}
+            isLoadingInsight={isLoadingInsight}
+          />
+        </section>
+
+        {/* TRACK: Gmail, Calendar, Infrastructure data feeds */}
+        <section aria-labelledby="track-sync-heading" className="space-y-4">
+          <div className="border-l-4 border-emerald-500 pl-3">
+            <h3 id="track-sync-heading" className="text-sm font-black text-emerald-850 uppercase tracking-widest">
+              TRACK: Live Ecosystem Workspace Feeds
+            </h3>
+          </div>
+          <WorkspaceSyncSandbox
+            onAddEntry={handleAddNewEntry}
+            gridEmissions={settings.gridEmissions}
+          />
+        </section>
+
+        {/* PROGRESS: Goal Streak habits and budget control tracker */}
+        <section aria-labelledby="progress-heading" className="space-y-4">
+          <div className="border-l-4 border-emerald-500 pl-3">
+            <h3 id="progress-heading" className="text-sm font-black text-emerald-850 uppercase tracking-widest">
+              PROGRESS: Core Baseline Settings & Streak Controls
+            </h3>
+          </div>
+          <GoalStreakCard
+            entries={entries}
+            settings={settings}
+            onUpdateSettings={setSettings}
+          />
+          <BenchmarkBanner
+            monthlyAmountKg={monthlyTotal}
+            benchmarkConstantKgYearly={settings.nationalAverageKg}
+          />
+        </section>
+
+        {/* UNDERSTAND: Charts, analysis overlays, and database logs audits */}
+        <section aria-labelledby="understand-heading" className="space-y-4">
+          <div className="border-l-4 border-emerald-500 pl-3">
+            <h3 id="understand-heading" className="text-sm font-black text-emerald-850 uppercase tracking-widest">
+              UNDERSTAND: Data Breakdowns & Audit Trails
+            </h3>
+          </div>
+          <BreakdownChart entries={entries} />
+          
+          {/* Recent logs audit section */}
+          {entries.length > 0 && (
+            <div className="bg-white rounded-[2rem] border border-stone-100 p-6 shadow-xs">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <History className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-stone-800">Recent Tracking Logs Audit</h4>
+                  <p className="text-[10px] text-stone-400 font-medium">Review and modify recent carbon records</p>
+                </div>
+              </div>
+
+              <div className="divide-y divide-stone-100">
+                {recentLogs.map((entry) => {
+                  const details = CATEGORY_DETAILS[entry.category];
+                  return (
+                    <div key={entry.id} className="py-3 flex justify-between items-center text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: details.color }} />
+                          <span className="font-extrabold text-[#1B3022]">{entry.category}</span>
+                          <span className="text-stone-400">•</span>
+                          <span className="text-stone-500 font-medium">{entry.subtype}</span>
+                          {entry.notes && (
+                            <span className="text-[9px] bg-stone-100 px-1.5 py-0.5 rounded text-stone-400">
+                              {entry.notes}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-stone-400 block mt-0.5">
+                          Logged {entry.date} with {entry.quantity} {entry.unit}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className={`font-black ${entry.co2e < 0 ? 'text-emerald-700' : 'text-stone-800'}`}>
+                          {entry.co2e > 0 ? `+${entry.co2e.toFixed(1)}` : entry.co2e.toFixed(1)} kg CO2e
+                        </span>
+                        <button
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          className="p-1 px-1.5 hover:bg-rose-50 rounded-lg text-stone-400 hover:text-rose-600 cursor-pointer"
+                          title="Delete log"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
 
       </main>
 

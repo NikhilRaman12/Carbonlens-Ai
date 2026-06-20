@@ -127,17 +127,18 @@ export default function QuickAddModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Subtype Dropdown */}
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+            <label htmlFor="subtype-select" className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
               Emission Class / Subtype
             </label>
             <select
+              id="subtype-select"
               value={subtype}
               onChange={(e) => {
                 setSubtype(e.target.value);
                 const sub = details.subtypes.find(s => s.name === e.target.value);
                 if (sub) setQuantity(String(sub.defaultVal));
               }}
-              className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:outline-2 focus:outline-emerald-500"
             >
               {details.subtypes.map((sub) => (
                 <option key={sub.name} value={sub.name}>
@@ -149,7 +150,7 @@ export default function QuickAddModal({
 
           {/* Quantity Input with inline unit */}
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+            <label htmlFor="quantity-input" className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
               Quantity / Distance ({details.unit})
             </label>
             <div className="relative">
@@ -162,7 +163,7 @@ export default function QuickAddModal({
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="Enter amount..."
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm font-bold focus:ring-1 focus:ring-emerald-500 focus:outline-none pr-16"
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 text-sm font-bold focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:outline-2 focus:outline-emerald-500 pr-16"
               />
               <span className="absolute right-4 top-3.5 text-xs text-stone-400 font-bold uppercase">
                 {details.unit}
@@ -194,27 +195,29 @@ export default function QuickAddModal({
           {/* Advanced fields toggled or standard */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+              <label htmlFor="date-input" className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                 Log Date
               </label>
               <input
+                id="date-input"
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:outline-2 focus:outline-emerald-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+              <label htmlFor="notes-input" className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                 Short Notes (Optional)
               </label>
               <input
+                id="notes-input"
                 type="text"
                 placeholder="e.g. daily commute"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none focus:outline-2 focus:outline-emerald-500"
               />
             </div>
           </div>

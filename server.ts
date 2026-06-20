@@ -13,8 +13,14 @@ import { createServer as createViteServer } from 'vite';
 // Load environment variables
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Safe __filename and __dirname resolution for both ESM (tsx dev) and bundled CJS
+const resolvedFilename = typeof import.meta !== 'undefined' && import.meta.url
+  ? fileURLToPath(import.meta.url)
+  : (typeof __filename !== 'undefined' ? __filename : '');
+
+const resolvedDirname = resolvedFilename
+  ? path.dirname(resolvedFilename)
+  : (typeof __dirname !== 'undefined' ? __dirname : '');
 
 const app = express();
 app.use(express.json());
