@@ -3,11 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { CarbonEntry, CarbonCategory } from '../types';
 import { CATEGORY_DETAILS } from '../constants';
 import {
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
@@ -21,6 +20,37 @@ import {
   Legend
 } from 'recharts';
 import { Calendar, TrendingUp, HelpCircle, Activity } from 'lucide-react';
+
+interface StableResponsiveContainerProps {
+  height?: number | string;
+  children: (width: number, height: number) => React.ReactElement;
+}
+
+function StableResponsiveContainer({ height = '100%', children }: StableResponsiveContainerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const element = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width, height: observedHeight } = entries[0].contentRect;
+      setDimensions({
+        width: Math.floor(width) || 400,
+        height: Math.floor(observedHeight) || (typeof height === 'number' ? height : 280),
+      });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [height]);
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: height }} className="w-full h-full">
+      {dimensions.width > 0 && dimensions.height > 0 && children(dimensions.width, dimensions.height)}
+    </div>
+  );
+}
 
 interface BreakdownChartProps {
   entries: CarbonEntry[];
@@ -178,43 +208,47 @@ export default function BreakdownChart({ entries }: BreakdownChartProps) {
             {/* Visual Chart area */}
             <div className="lg:col-span-7 h-[280px]">
               {chartType === 'donut' ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={95}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(val: number) => [`${val} kg CO2e`, 'Emissions']}
-                      contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <StableResponsiveContainer height={280}>
+                  {(width, height) => (
+                    <PieChart width={width} height={height}>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={95}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(val: number) => [`${val} kg CO2e`, 'Emissions']}
+                        contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
+                      />
+                    </PieChart>
+                  )}
+                </StableResponsiveContainer>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
-                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                    <Tooltip 
-                      formatter={(val: number) => [`${val} kg CO2e`, 'Emissions']}
-                      contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
-                    />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <StableResponsiveContainer height={280}>
+                  {(width, height) => (
+                    <BarChart width={width} height={height} data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip 
+                        formatter={(val: number) => [`${val} kg CO2e`, 'Emissions']}
+                        contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </StableResponsiveContainer>
               )}
             </div>
 
@@ -291,24 +325,26 @@ export default function BreakdownChart({ entries }: BreakdownChartProps) {
         </div>
 
         <div className="h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
-                labelStyle={{ fontSize: 9, fontWeight: 'bold' }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="CO2e (kg)" 
-                stroke="#059669" 
-                strokeWidth={2.5} 
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <StableResponsiveContainer height={200}>
+            {(width, height) => (
+              <LineChart width={width} height={height} data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9' }}
+                  labelStyle={{ fontSize: 9, fontWeight: 'bold' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="CO2e (kg)" 
+                  stroke="#059669" 
+                  strokeWidth={2.5} 
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            )}
+          </StableResponsiveContainer>
         </div>
       </div>
     </div>

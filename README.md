@@ -1,6 +1,8 @@
 # CarbonLens ⎯ Modern AI Carbon Footprint Coach
 
-CarbonLens is a production-ready climate-tech web application designed to help individuals **understand, track, and reduce** their personal carbon footprints. Centered on a modern and high-contrast nature-inspired design philosophy, CarbonLens combines realistic mathematical modeling of emission streams with actionable local suggestions and robust accessibility features.
+CarbonLens AI is a personal carbon intelligence coach that helps individuals understand, track, and reduce their carbon footprint through simple actions, category-wise analytics, and personalized AI-powered insights.
+
+Centered on a modern and high-contrast nature-inspired design philosophy, CarbonLens combines realistic mathematical modeling of emission streams with actionable local suggestions and robust accessibility features.
 
 Developed to comply with rigorous frontend architecture standards, CarbonLens is highly optimized, fully tested, and fits the PromptWars submission guidelines perfectly.
 
@@ -92,7 +94,7 @@ To run all tests locally, use:
 npm run test
 ```
 
-Currently, **all 15 primary logical and visual tests are building and compiling successfully with 100% green status**.
+Currently, **all 19 primary logical and visual tests are building and compiling successfully with 100% green status**.
 
 ---
 

@@ -1,6 +1,17 @@
 import '@testing-library/jest-dom';
 import { beforeAll, vi } from 'vitest';
 
+// Stub Recharts responsive container warning / dimensions at top level to avoid hoisting warning
+vi.mock('recharts', async () => {
+  const original = await vi.importActual<any>('recharts');
+  const ReactMock = await import('react');
+  return {
+    ...original,
+    ResponsiveContainer: ({ children }: { children: any }) =>
+      ReactMock.default.createElement('div', { style: { width: 800, height: 400 } }, children),
+  };
+});
+
 beforeAll(() => {
   // Stub standard window matchMedia
   Object.defineProperty(window, 'matchMedia', {
@@ -26,16 +37,5 @@ beforeAll(() => {
   Object.defineProperty(window, 'ResizeObserver', {
     writable: true,
     value: ResizeObserverMock,
-  });
-
-  // Stub Recharts responsive container warning / dimensions
-  vi.mock('recharts', async () => {
-    const original = await vi.importActual<any>('recharts');
-    const ReactMock = await import('react');
-    return {
-      ...original,
-      ResponsiveContainer: ({ children }: { children: any }) =>
-        ReactMock.default.createElement('div', { style: { width: 800, height: 400 } }, children),
-    };
   });
 });

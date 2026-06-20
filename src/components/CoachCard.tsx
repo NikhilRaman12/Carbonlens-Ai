@@ -5,7 +5,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { CoachInsight, ChatMessage, CarbonEntry } from '../types';
-import { BrainCircuit, Send, Sparkles, MessageSquare, ListCollapse, RefreshCw, Smartphone } from 'lucide-react';
+import { BrainCircuit, Send, Sparkles, MessageSquare, ListCollapse, RefreshCw, Smartphone, TrendingDown, Clock, ShieldCheck, DollarSign } from 'lucide-react';
+import { getTopEmissionCategory, getBestReductionAction } from '../utils/carbonMath';
 
 interface CoachCardProps {
   entries: CarbonEntry[];
@@ -34,6 +35,10 @@ export default function CoachCard({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Compute highest category and recommendations instantly
+  const topData = getTopEmissionCategory(entries);
+  const spotlightAction = getBestReductionAction(topData.category);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isSendingMessage) return;
@@ -128,15 +133,47 @@ export default function CoachCard({
               <p className="text-xs text-stone-200 animate-pulse font-medium">Analyzing entries, simulating carbon offsets...</p>
             </div>
           ) : !insight ? (
-            <div className="py-16 text-center space-y-4 bg-white/5 rounded-2xl p-6 border border-white/5">
-              <Sparkles className="w-8 h-8 text-emerald-400 mx-auto" />
-              <p className="text-sm font-medium text-emerald-100">Click below to activate your personalized coach's carbon lens!</p>
-              <button
-                onClick={onRefreshInsight}
-                className="bg-emerald-500 hover:bg-emerald-400 font-bold text-white text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-950/50 cursor-pointer"
-              >
-                Assemble Recommendations
-              </button>
+            <div className="space-y-4">
+              <div className="py-8 text-center space-y-4 bg-white/5 rounded-2xl p-6 border border-white/5">
+                <Sparkles className="w-8 h-8 text-emerald-400 mx-auto" />
+                <p className="text-sm font-medium text-emerald-100 font-sans">Click below to activate your personalized coach's carbon lens!</p>
+                <button
+                  onClick={onRefreshInsight}
+                  className="bg-emerald-500 hover:bg-emerald-400 font-bold text-white text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-950/50 cursor-pointer"
+                >
+                  Assemble Recommendations
+                </button>
+              </div>
+
+              {/* Local Real-time Action Card as placeholder preview */}
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/5 hover:border-white/15 transition-all text-xs space-y-2">
+                <span className="text-[9px] font-black tracking-widest text-teal-300 uppercase block">
+                  Offline Live Spotlight Target
+                </span>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-extrabold text-white text-xs">{spotlightAction.title}</h4>
+                  <span className="shrink-0 bg-emerald-600 text-white px-2 py-0.5 rounded-full font-black text-[10px]">
+                    -{spotlightAction.savedKg} kg CO2e
+                  </span>
+                </div>
+                <p className="text-emerald-100/80 leading-relaxed text-[11px]">
+                  {spotlightAction.whyFits}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    Diff: {spotlightAction.difficulty}
+                  </span>
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1">
+                    <DollarSign className="w-3 h-3 text-emerald-400" />
+                    Impact: {spotlightAction.costImpact}
+                  </span>
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-emerald-400" />
+                    Time: {spotlightAction.timeRequired}
+                  </span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -145,19 +182,40 @@ export default function CoachCard({
               </p>
 
               {/* Quantified Action Spotlight */}
-              <div className="bg-white/10 rounded-2xl p-4 border border-white/5 hover:border-white/15 transition-all">
-                <span className="text-[9px] font-black tracking-widest text-teal-300 uppercase block mb-1">
-                  Proposed Weekly reduction
-                </span>
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-bold text-white">{insight.quantifiedAction.title}</h4>
-                  <span className="shrink-0 bg-emerald-505 text-white bg-emerald-600 px-2.5 py-1 rounded-full text-xs font-black shadow-xs">
-                    -{insight.quantifiedAction.savedKg} kg CO2e
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/5 hover:border-white/15 transition-all text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black tracking-widest text-teal-300 uppercase block">
+                    Your Next Best Personalized Action
+                  </span>
+                  <span className="bg-teal-500/30 text-teal-200 text-[8px] font-black border border-teal-500/25 px-2 py-0.5 rounded uppercase">
+                    Highest: {spotlightAction.category}
                   </span>
                 </div>
-                <p className="text-xs text-emerald-200/90 mt-1.5 leading-relaxed">
-                  {insight.quantifiedAction.description}
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-bold text-white leading-snug">{insight.quantifiedAction.title || spotlightAction.title}</h4>
+                  <span className="shrink-0 bg-emerald-600 text-white px-2.5 py-1 rounded-full text-xs font-black shadow-xs">
+                    -{insight.quantifiedAction.savedKg || spotlightAction.savedKg} kg CO2e
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200/95 leading-relaxed">
+                  {insight.quantifiedAction.description || spotlightAction.whyFits}
                 </p>
+
+                {/* Highly structured metadata badges mapping Section 3 */}
+                <div className="flex flex-wrap gap-2 pt-1 border-t border-white/5 mt-2">
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    Diff: {spotlightAction.difficulty}
+                  </span>
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    Impact: {spotlightAction.costImpact}
+                  </span>
+                  <span className="bg-white/10 text-emerald-250 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    Time: {spotlightAction.timeRequired}
+                  </span>
+                </div>
               </div>
 
               {/* Encouragement Accent */}
