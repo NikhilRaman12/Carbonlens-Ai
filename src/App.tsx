@@ -16,7 +16,11 @@ import WorkspaceSyncSandbox from './components/WorkspaceSyncSandbox';
 import { 
   getTopEmissionCategory, 
   calculateCO2eWeeklySavings, 
-  getBestReductionAction 
+  getBestReductionAction,
+  getTodayTotalCO2e,
+  getMonthlyTotalCO2e,
+  calculateEnvironmentalEquivalencies,
+  getLocalTodayDate
 } from './utils/carbonMath';
 
 import {
@@ -437,7 +441,7 @@ export default function App() {
     content += `==============================================\n\n`;
     content += `## KEY STATS SUMMARY\n`;
     content += `- Total Monthly Ceiling Target: ${(settings.customReferenceBaseline * (1 - settings.targetPercentage / 100)).toFixed(0)} kg CO2e\n`;
-    content += `- Logged Monthly Emissions: ${getMonthlyTotalCO2e().toFixed(2)} kg CO2e\n`;
+    content += `- Logged Monthly Emissions: ${monthlyTotal.toFixed(2)} kg CO2e\n`;
     content += `- Estimated Weekly Savings: ${savings} kg CO2e\n`;
     content += `- Highest Carbon Driver: ${topCategoryInfo.category} (${topCategoryInfo.co2e} kg CO2e)\n\n`;
     
@@ -480,45 +484,8 @@ export default function App() {
     }
   };
 
-  // Helper to extract safe system date details (avoid UTC/local discrepancy)
-  const getLocalTodayDate = () => {
-    const today = new Date();
-    return {
-      year: today.getFullYear(),
-      month: today.getMonth(),
-      day: today.getDate()
-    };
-  };
-
-  // Safe timezone aggregations
-  const getTodayTotalCO2e = () => {
-    const { year, month, day } = getLocalTodayDate();
-    return entries
-      .filter((e) => {
-        const parts = e.date.split('-');
-        if (parts.length !== 3) return false;
-        return parseInt(parts[0], 10) === year &&
-               (parseInt(parts[1], 10) - 1) === month &&
-               parseInt(parts[2], 10) === day;
-      })
-      .reduce((sum, e) => sum + e.co2e, 0);
-  };
-
-  const todayTally = getTodayTotalCO2e();
-
-  const getMonthlyTotalCO2e = () => {
-    const { year, month } = getLocalTodayDate();
-    return entries
-      .filter((e) => {
-        const parts = e.date.split('-');
-        if (parts.length !== 3) return false;
-        return parseInt(parts[0], 10) === year &&
-               (parseInt(parts[1], 10) - 1) === month;
-      })
-      .reduce((sum, e) => sum + e.co2e, 0);
-  };
-
-  const monthlyTotal = getMonthlyTotalCO2e();
+  const todayTally = getTodayTotalCO2e(entries);
+  const monthlyTotal = getMonthlyTotalCO2e(entries);
 
   // Current period entries for Quick Log Category Tile aggregations
   const getPeriodFilteredEntries = () => {
@@ -562,6 +529,18 @@ export default function App() {
   const recentLogs = [...entries]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
+
+  const monthlyCeiling = settings.customReferenceBaseline * (1 - settings.targetPercentage / 100);
+  const progressPct = parseFloat(Math.min(100, Math.max(0, (monthlyTotal / (monthlyCeiling || 1)) * 100)).toFixed(0));
+  const weeklySavings = calculateCO2eWeeklySavings(entries, settings.customReferenceBaseline);
+  const topCategoryInfo = getTopEmissionCategory(entries);
+  const spotlightActionObj = getBestReductionAction(topCategoryInfo.category);
+  const isOverBudget = monthlyTotal > monthlyCeiling;
+  const progressColorClass = isOverBudget
+    ? 'bg-rose-600'
+    : progressPct >= 80
+    ? 'bg-amber-500'
+    : 'bg-emerald-500';
 
   return (
     <div id="carbonlens-root" className="min-h-screen bg-stone-50 text-stone-850 font-sans selection:bg-emerald-200 select-none pb-12">
@@ -654,111 +633,92 @@ export default function App() {
         </div>
 
         {/* CARBON HUD - ADOPTION PERFORMANCE SCORECARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {(() => {
-            const monthlyCeiling = settings.customReferenceBaseline * (1 - settings.targetPercentage / 100);
-            const progressPct = parseFloat(Math.min(100, Math.max(0, (monthlyTotal / (monthlyCeiling || 1)) * 100)).toFixed(0));
-            const weeklySavings = calculateCO2eWeeklySavings(entries, settings.customReferenceBaseline);
-            const topCategoryInfo = getTopEmissionCategory(entries);
-            const spotlightActionObj = getBestReductionAction(topCategoryInfo.category);
+        <div id="carbon-hud-scorecards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Scorecard 1: Budget Ceiling Progress */}
+          <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="text-[9px] uppercase font-black text-stone-400 tracking-wider block">
+                Target Ceiling Progress
+              </span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl font-black text-stone-850 font-mono">
+                  {progressPct}%
+                </span>
+                <span className="text-xs text-stone-500 font-bold">consumed</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                <div className={`h-full ${progressColorClass} transition-all duration-500`} style={{ width: `${progressPct}%` }}></div>
+              </div>
+              <p className="text-[10px] text-stone-400 font-semibold leading-none flex items-center gap-1">
+                {isOverBudget ? (
+                  <>
+                    <AlertTriangle className="w-3 h-3 text-rose-500 inline shrink-0" />
+                    <span className="text-rose-600">Surpassed limit by {(monthlyTotal - monthlyCeiling).toFixed(1)} kg!</span>
+                  </>
+                ) : (
+                  <span>{(monthlyCeiling - monthlyTotal).toFixed(1)} kg remaining this month</span>
+                )}
+              </p>
+            </div>
+          </div>
 
-            const isOverBudget = monthlyTotal > monthlyCeiling;
-            const progressColorClass = isOverBudget
-              ? 'bg-rose-600'
-              : progressPct >= 80
-              ? 'bg-amber-500'
-              : 'bg-emerald-500';
+          {/* Scorecard 2: Estimated Weekly Savings */}
+          <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <span className="text-[9px] uppercase font-black text-emerald-700 tracking-wider block">
+                Estimated Weekly Savings
+              </span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl font-black text-emerald-800 font-mono">
+                  {weeklySavings}
+                </span>
+                <span className="text-xs text-emerald-700 font-bold">kg CO2e</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-stone-400 font-semibold mt-3 leading-relaxed">
+              Carbon trimmed this week relative to your budget limit baseline. Great work!
+            </p>
+          </div>
 
-            return (
-              <>
-                {/* Scorecard 1: Budget Ceiling Progress */}
-                <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs space-y-3 flex flex-col justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-stone-400 tracking-wider block">
-                      Target Ceiling Progress
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-2xl font-black text-stone-850 font-mono">
-                        {progressPct}%
-                      </span>
-                      <span className="text-xs text-stone-500 font-bold">consumed</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
-                      <div className={`h-full ${progressColorClass} transition-all duration-500`} style={{ width: `${progressPct}%` }}></div>
-                    </div>
-                    <p className="text-[10px] text-stone-400 font-semibold leading-none flex items-center gap-1">
-                      {isOverBudget ? (
-                        <>
-                          <AlertTriangle className="w-3 h-3 text-rose-500 inline shrink-0" />
-                          <span className="text-rose-600">Surpassed limit by {(monthlyTotal - monthlyCeiling).toFixed(1)} kg!</span>
-                        </>
-                      ) : (
-                        <span>{(monthlyCeiling - monthlyTotal).toFixed(1)} kg remaining this month</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
+          {/* Scorecard 3: Peak Footprint Category */}
+          <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <span className="text-[9px] uppercase font-black text-stone-400 tracking-wider block">
+                Peak Emission Driver
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-1 overflow-hidden">
+                <span className="text-lg font-black text-stone-850 truncate block tracking-tight">
+                  {topCategoryInfo.category}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2.5">
+              <span className="text-[10px] text-stone-400 font-bold">Month Total:</span>
+              <span className="text-xs font-extrabold text-stone-850 font-mono">
+                {entries.filter(e => e.category === topCategoryInfo.category).reduce((sum, e) => sum + e.co2e, 0).toFixed(1)} kg
+              </span>
+            </div>
+          </div>
 
-                {/* Scorecard 2: Estimated Weekly Savings */}
-                <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-emerald-700 tracking-wider block">
-                      Estimated Weekly Savings
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-2xl font-black text-emerald-800 font-mono">
-                        {weeklySavings}
-                      </span>
-                      <span className="text-xs text-emerald-700 font-bold">kg CO2e</span>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-stone-400 font-semibold mt-3 leading-relaxed">
-                    Carbon trimmed this week relative to your budget limit baseline. Great work!
-                  </p>
-                </div>
-
-                {/* Scorecard 3: Peak Footprint Category */}
-                <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-stone-400 tracking-wider block">
-                      Peak Emission Driver
-                    </span>
-                    <div className="flex items-baseline gap-1.5 mt-1 overflow-hidden">
-                      <span className="text-lg font-black text-stone-850 truncate block tracking-tight">
-                        {topCategoryInfo.category}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2.5">
-                    <span className="text-[10px] text-stone-400 font-bold">Month Total:</span>
-                    <span className="text-xs font-extrabold text-stone-850 font-mono">
-                      {entries.filter(e => e.category === topCategoryInfo.category).reduce((sum, e) => sum + e.co2e, 0).toFixed(1)} kg
-                    </span>
-                  </div>
-                </div>
-
-                {/* Scorecard 4: Top Action Checkpoint */}
-                <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-indigo-700 tracking-wider block">
-                      Spotlight Habit Tweak
-                    </span>
-                    <p className="text-[11px] font-black text-stone-800 mt-1.5 leading-snug tracking-tight line-clamp-2 min-h-[2rem]">
-                      {spotlightActionObj.title}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-indigo-50/60 pt-2 mt-2">
-                    <span className="text-[9px] text-indigo-500 font-extrabold uppercase">Potential:</span>
-                    <span className="text-[10px] font-bold text-indigo-700">
-                      -{spotlightActionObj.savedKg} kg/mo offset
-                    </span>
-                  </div>
-                </div>
-              </>
-            );
-          })()}
+          {/* Scorecard 4: Top Action Checkpoint */}
+          <div className="bg-white rounded-[2rem] border border-stone-200/60 p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <span className="text-[9px] uppercase font-black text-indigo-700 tracking-wider block">
+                Spotlight Habit Tweak
+              </span>
+              <p className="text-[11px] font-black text-stone-800 mt-1.5 leading-snug tracking-tight line-clamp-2 min-h-[2rem]">
+                {spotlightActionObj.title}
+              </p>
+            </div>
+            <div className="flex items-center justify-between border-t border-indigo-50/60 pt-2 mt-2">
+              <span className="text-[9px] text-indigo-500 font-extrabold uppercase">Potential:</span>
+              <span className="text-[10px] font-bold text-indigo-700">
+                -{spotlightActionObj.savedKg} kg/mo offset
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -768,13 +728,13 @@ export default function App() {
         {/* CHALLENGE ALIGNMENT & ONBOARDING SYSTEM */}
         <section aria-labelledby="challenge-onboarding-title" className="bg-white border border-stone-200 rounded-[2.5rem] p-8 shadow-xs space-y-8">
           
-          {/* Top Grid: Mission & Highlight Checklist */}
+          {/* Top Section: Mission & Core Objectives */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             
-            {/* Left Hand: High impact checklist & Challenge statement */}
+            {/* Left Hand: High impact challenge statement */}
             <div className="space-y-4">
               <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-800 px-3.5 py-1.5 rounded-full font-black uppercase tracking-widest inline-block">
-                Mission Statement
+                Evaluator Alignment Ledger
               </span>
               <h2 id="challenge-onboarding-title" className="text-2xl font-black text-stone-900 tracking-tight leading-none">
                 Empower Your Low-Carbon Lifestyle
@@ -783,7 +743,7 @@ export default function App() {
               <div className="bg-stone-50 border border-stone-100 p-4.5 rounded-2xl space-y-1.5">
                 <p className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
                   <Info className="w-4 h-4 text-emerald-600 sm:shrink-0" />
-                  <span>Why It Matters:</span>
+                  <span>The Climate Challenge:</span>
                 </p>
                 <p className="text-[11px] text-stone-500 font-semibold leading-relaxed">
                   While most individuals actively wish to lower their environmental impact, they lack clear, calculated visibility into which daily choices actually carry the highest carbon significance. CarbonLens solves this by translating complex emission datasets into simple, real-time, measurable actions.
@@ -791,39 +751,39 @@ export default function App() {
               </div>
 
               <div className="space-y-2">
-                <span className="block text-xs font-black text-stone-800 uppercase tracking-wider">CarbonLens helps you:</span>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-stone-600">
+                <span className="block text-xs font-black text-stone-850 uppercase tracking-wider">CarbonLens Challenge Framework:</span>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-stone-600">
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>1. Understand your footprint</span>
+                    <span>1. UNDERSTAND emissions</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>2. Track daily activities</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <span>2. TRACK daily activities</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>3. Reduce through simple actions</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span>3. REDUCE carbon footprint</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>4. Get personalized AI insights</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                    <span>4. Receive PERSONALIZE AI insights</span>
                   </li>
                 </ul>
               </div>
             </div>
 
-            {/* Right Hand: 4 Core Feature Cards */}
+            {/* Right Hand: 4 Core Bento Objectives */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { title: 'Understand', text: 'Analyze category-wise carbon breakdowns with professional reactive charts.', color: 'border-emerald-100 bg-emerald-50/20 text-emerald-800' },
-                { title: 'Track', text: 'Log consumption points instantly through simple, tactile click tapping.', color: 'border-blue-100 bg-blue-50/20 text-blue-800' },
-                { title: 'Reduce', text: 'Uncover immediate, actionable, carbon-saving adjustments.', color: 'border-indigo-100 bg-indigo-50/20 text-indigo-800' },
-                { title: 'Personalize', text: 'Obtain deep, context-aware AI reduction advice powered by Gemini.', color: 'border-violet-100 bg-violet-50/20 text-violet-800' }
+                { label: 'UNDERSTAND', text: 'Analyze category-wise carbon breakdowns with professional reactive charts.', color: 'border-emerald-100 bg-emerald-50/20 text-emerald-800' },
+                { label: 'TRACK', text: 'Log consumption points instantly through simple, tactile click tapping and Workspace feeds.', color: 'border-blue-100 bg-blue-50/20 text-blue-800' },
+                { label: 'REDUCE', text: 'Uncover immediate, actionable, carbon-saving adjustments outlined by exact math.', color: 'border-indigo-100 bg-indigo-50/20 text-indigo-800' },
+                { label: 'PERSONALIZE', text: 'Obtain deep, context-aware AI reduction advice powered by backend Gemini LLM queries.', color: 'border-violet-100 bg-violet-50/20 text-violet-800' }
               ].map((feat, idx) => (
                 <div key={idx} className={`p-4 rounded-2xl border ${feat.color} space-y-1`}>
-                  <h4 className="text-xs font-black uppercase tracking-wider">{feat.title}</h4>
-                  <p className="text-[11px] text-stone-500 font-semibold leading-relaxed">{feat.text}</p>
+                  <h4 className="text-[10px] font-black uppercase tracking-wider">{feat.label}</h4>
+                  <p className="text-[11px] text-stone-600 font-semibold leading-relaxed">{feat.text}</p>
                 </div>
               ))}
             </div>
@@ -832,18 +792,18 @@ export default function App() {
 
           <hr className="border-t border-stone-100" />
 
-          {/* Bottom Grid: Impact Journey Step Process */}
+          {/* Middle Section: Integrated Step-by-Step User Journey */}
           <div className="space-y-4">
             <span className="block text-xs font-black text-stone-850 uppercase tracking-widest text-center">
-              Your 4-Step Carbon Reduction Journey
+              Your 4-Loop Carbon Optimization Journey
             </span>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { step: 'Step 1', title: 'Log Lifestyle', desc: 'Input your energy, gas, water, or commute data in seconds.' },
-                { step: 'Step 2', title: 'View Target CO2e', desc: 'Instantly watch your daily and monthly numbers sync.' },
-                { step: 'Step 3', title: 'Get AI Advice', desc: 'Assemble custom, personalized recommendations for optimization.' },
-                { step: 'Step 4', title: 'Track Savings', desc: 'Build steady habits and compare trends against benchmarks.' }
+                { step: 'Step 1', title: 'Log Lifestyle Activities', desc: 'Input your energy grid, thermal gas, water flow, or transport miles in seconds.' },
+                { step: 'Step 2', title: 'View Estimated CO₂e', desc: 'Instantly watch your daily tallies and category levels compile.' },
+                { step: 'Step 3', title: 'Receive Personalized Actions', desc: 'Assemble custom, structured recommendations for carbon reduction.' },
+                { step: 'Step 4', title: 'Track Progress & Savings', desc: 'Build steady habits and compare trends against benchmarks.' }
               ].map((journey, idx) => (
                 <div key={idx} className="bg-stone-50 border border-stone-100 p-5 rounded-2xl space-y-2 relative">
                   <span className="text-[9px] uppercase font-black text-emerald-600 tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
@@ -856,6 +816,117 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <hr className="border-t border-stone-100" />
+
+          {/* Bottom Section: Dedicated Measurable Impact Section */}
+          <div className="space-y-4">
+            <div className="text-center space-y-1">
+              <span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-black uppercase tracking-wider inline-block">
+                Measurable Impact Registry
+              </span>
+              <h3 className="text-sm font-black text-stone-850 uppercase tracking-wider text-center mt-1">
+                Real-Time Environmental LEDGER
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              
+              {/* Metric 1 */}
+              <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100 space-y-1 text-center">
+                <span className="text-[9px] text-stone-450 uppercase font-black tracking-wider block">Monthly Footprint</span>
+                <span className="text-xl font-mono font-black text-stone-800 block">{monthlyTotal.toFixed(1)} kg</span>
+                <span className="text-[9px] text-stone-400 font-bold block">Current month totals</span>
+              </div>
+
+              {/* Metric 2 */}
+              <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100 space-y-1 text-center">
+                <span className="text-[9px] text-stone-450 uppercase font-black tracking-wider block">Top Emission Category</span>
+                <span className="text-xs font-sans font-black text-stone-800 block truncate">{topCategoryInfo.category}</span>
+                <span className="text-[9px] text-stone-450 font-mono font-bold block">{topCategoryInfo.co2e.toFixed(1)} kg CO2e</span>
+              </div>
+
+              {/* Metric 3 */}
+              <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100 space-y-1 text-center">
+                <span className="text-[9px] text-stone-450 uppercase font-black tracking-wider block">Target Reduction</span>
+                <span className="text-xl font-mono font-black text-emerald-700 block">-{settings.targetPercentage}%</span>
+                <span className="text-[9px] text-stone-400 font-bold block">Goal configuration</span>
+              </div>
+
+              {/* Metric 4 */}
+              <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100 space-y-1 text-center">
+                <span className="text-[9px] text-stone-450 uppercase font-black tracking-wider block">Est. Monthly Savings</span>
+                <span className="text-xl font-mono font-black text-emerald-800 block">{(weeklySavings * 4.33).toFixed(1)} kg</span>
+                <span className="text-[9px] text-emerald-700 font-bold block">CO2e avoided</span>
+              </div>
+
+              {/* Metric 5 */}
+              <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100 space-y-1 text-center lg:col-span-1">
+                <span className="text-[9px] text-indigo-500 uppercase font-black tracking-wider block">Suggested Action</span>
+                <span className="text-[10px] font-sans font-black text-indigo-900 block truncate leading-tight" title={spotlightActionObj.title}>
+                  {spotlightActionObj.title}
+                </span>
+                <span className="text-[9px] text-indigo-700 font-bold block">-{spotlightActionObj.savedKg} kg potential</span>
+              </div>
+
+            </div>
+
+            {/* Tangible Environmental Equivalencies mapping Phase 5 */}
+            {(() => {
+              const monthlySavedKg = weeklySavings * 4.33;
+              const equiv = calculateEnvironmentalEquivalencies(monthlySavedKg);
+
+              return (
+                <div className="bg-gradient-to-br from-emerald-900 to-teal-950 rounded-3xl p-5 text-white space-y-3 shadow-md">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-white/10 pb-2">
+                    <span className="text-xs uppercase font-black tracking-widest text-emerald-250 block">Your Footprint In Physical Outcomes</span>
+                    <span className="text-[10px] text-stone-300 font-semibold block">Based on estimated monthly cumulative savings of <b>{monthlySavedKg.toFixed(1)} kg CO₂e</b></span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1.5">
+                      <span className="text-lg block">🌲</span>
+                      <div>
+                        <span className="block text-[10px] text-emerald-200 uppercase font-black tracking-wider">Forest Carbon Equivalent</span>
+                        <span className="block text-lg font-mono font-black">{equiv.treesEquivalent} tree-months</span>
+                        <p className="text-[9px] text-stone-300 font-medium leading-tight">Fully grown pines consuming CO₂</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1.5">
+                      <span className="text-lg block">⛽</span>
+                      <div>
+                        <span className="block text-[10px] text-emerald-200 uppercase font-black tracking-wider">Unburned Petrol Saved</span>
+                        <span className="block text-lg font-mono font-black">{equiv.gasolineSavedLiters} Liters</span>
+                        <p className="text-[9px] text-stone-300 font-medium leading-tight">Indirect transportation fuel avoided</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1.5">
+                      <span className="text-lg block">💡</span>
+                      <div>
+                        <span className="block text-[10px] text-emerald-200 uppercase font-black tracking-wider">LED Light Hours Run</span>
+                        <span className="block text-lg font-mono font-black">{equiv.ledHoursRun} Hours</span>
+                        <p className="text-[9px] text-stone-300 font-medium leading-tight">Continuous run hours avoided</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1.5">
+                      <span className="text-lg block">🪨</span>
+                      <div>
+                        <span className="block text-[10px] text-emerald-200 uppercase font-black tracking-wider">Grid Coal Restrained</span>
+                        <span className="block text-lg font-mono font-black">{equiv.coalAvoidedKg} kg</span>
+                        <p className="text-[9px] text-stone-300 font-medium leading-tight">Avoided thermal plant combustion</p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
 
         </section>
